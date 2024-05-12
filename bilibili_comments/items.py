@@ -7,6 +7,14 @@ import scrapy
 
 
 class BilibiliCommentsItem(scrapy.Item):
-    # define the fields for your item here like:
-    # name = scrapy.Field()
-    pass
+    # 用户uid
+    uid = scrapy.Field()
+    # 回复内容
+    content = scrapy.Field()
+    # 评论时间
+    date = scrapy.Field()
+    # 父标识
+    father = scrapy.Field()
+    # 子标识
+    child = scrapy.Field()
+
