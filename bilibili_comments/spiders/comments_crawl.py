@@ -20,13 +20,34 @@ class CommentsCrawlSpider(scrapy.Spider):
     name = 'comments_crawl'
     allowed_domains = ['bilibili.com/','api.bilibili.com']
     start_urls = 'http://www.bilibili.com/'
-    # 父评论区url
+    # 父评论区url和请求参数
     url_main = 'https://api.bilibili.com/x/v2/reply/wbi/main?'
+    params_main = {
+        "type": '1',
+        "mode": '3',
+        "pagination_str": "{\"offset\":\"\"}",
+        "plat": '1',
+        "seek_rpid": "",
+        "web_location": "1315875",
+        "wts": int(time.time())
+    }
+    params_next = {
+        "type": "1",
+        "mode": "3",
+        "pagination_str": "{\"offset\":\"{\\\"type\\\":1,\\\"direction\\\":1,\\\"session_id\\\":\\\"1756344138195927\\\",\\\"data\\\":{}}\"}",
+        "plat": "1",
+        "web_location": "1315875",
+    }
+    # 子评论区url
+    url_child = 'https://api.bilibili.com/x/v2/reply/reply?'
+    params_chlid = {
+        "type": "1",
+        "ps": "10",
+        "gaia_source": "main_web",
+        "web_location": "333.788",
+    }
     # 视频id
     oid = ''
-    # 储存子评论区的root
-    roots = []
-
 
 
     def md5_encode(self, s):
@@ -56,35 +77,6 @@ class CommentsCrawlSpider(scrapy.Spider):
         return w_rid
 
 
-    # 返回数据并且进行对子评论进行请求
-    def get_father_comment(self,comments):
-        items = BilibiliCommentsItem()
-        for i in range(len(comments['data']['replies'])):
-            uid = comments['data']['replies'][i]['mid_str']
-            content = comments['data']['replies'][i]['content']['message']
-            date = datetime.fromtimestamp(comments['data']['replies'][i]['ctime']).strftime('%Y-%m-%d')
-            # 这里判断有没有回复，如果不是空数组就存入root，并且把数据存到父评论区的列表中
-            if comments['data']['replies'][i]['replies']:
-                root = comments['data']['replies'][i]['rpid_str']
-                # 对子评论区进行请求
-                # if root:
-                #     yield
-                items['uid'] = uid
-                items['content'] = content
-                items['date'] = date
-                items['father'] = ''
-                items['child'] = root
-                yield items
-            else:
-                items['uid'] = uid
-                items['content'] = content
-                items['date'] = date
-                items['father'] = ''
-                items['child'] = ''
-                yield items
-
-
-
     # 第一次请求页面（这里可以进行多个视频的评论区进行爬取），生成oid
     def start_requests(self):
         for i,bv in enumerate(BV):
@@ -93,6 +85,7 @@ class CommentsCrawlSpider(scrapy.Spider):
 
     # 这里实现了父评论区的全部爬取
     def parse(self, response):
+        logger.info('=====开始评论区请求=====')
         session = requests.session()
         # 获取视频的oid
         self.oid = response.text.split('"aid":')[1].split(',')[0]
@@ -102,51 +95,118 @@ class CommentsCrawlSpider(scrapy.Spider):
             time.sleep(father_time)
             # 这里只访问一次第一页
             if flag:
-                params = {
-                    "oid": self.oid,
-                    "type": '1',
-                    "mode": '3',
-                    "pagination_str": "{\"offset\":\"\"}",
-                    "plat": '1',
-                    "seek_rpid": "",
-                    "web_location": "1315875",
-                    "wts": int(time.time())
-                }
                 # 生成加密参数
+                params = self.params_main.copy()
+                params['oid'] = self.oid
                 w_rid = self.get_rid(params)
                 params['w_rid'] = w_rid
                 response = session.get(url=self.url_main, headers=HEADERS, params=params, cookies=COOKIES)
+                logger.success('父评论请求成功')
                 flag = 0
             else:
-                params_next = {
-                    "oid": self.oid,
-                    "type": "1",
-                    "mode": "3",
-                    "pagination_str": "{\"offset\":\"{\\\"type\\\":1,\\\"direction\\\":1,\\\"session_id\\\":\\\"1756344138195927\\\",\\\"data\\\":{}}\"}",
-                    "plat": "1",
-                    "web_location": "1315875",
-                }
-                params = params_next.copy()
+                params = self.params_next.copy()
+                params['oid'] = self.oid
                 params["wts"] = int(time.time())
                 w_rid = self.get_rid(params)
                 params['w_rid'] = w_rid
-
-                # 发送请求
-                response = session.get(url=self.url_main, headers=HEADERS, params=params, cookies=COOKIES)
+                response = session.get(url=self.url_main ,headers=HEADERS, params=params, cookies=COOKIES)
+                logger.success('父评论请求成功')
 
             comments = json.loads(response.text)
             # 如果有评论
             if comments['data']['replies']:
-                print(comments)
-                self.get_father_comment(comments)
+                # 返回数据并且进行对子评论进行请求
+                items = BilibiliCommentsItem()
+                for i in range(len(comments['data']['replies'])):
+                    uid = comments['data']['replies'][i]['mid_str']
+                    content = comments['data']['replies'][i]['content']['message']
+                    date = datetime.fromtimestamp(comments['data']['replies'][i]['ctime']).strftime('%Y-%m-%d')
+                    # 这里判断有没有回复，如果不是空数组就存入root，并且把数据存到父评论区的列表中
+                    if comments['data']['replies'][i]['replies']:
+                        root = comments['data']['replies'][i]['rpid_str']
+                        # 对子评论区进行请求
+                        params = self.params_chlid.copy()
+                        params['oid'] = self.oid
+                        params["wts"] = int(time.time())
+                        params["root"] = root
+                        params["pn"] = 1
+                        w_rid = self.get_rid(params)
+                        params['w_rid'] = w_rid
+                        url = self.url_child + urlencode(params)
+                        yield scrapy.Request(url=url, headers=HEADERS, meta={'root': root}, cookies=COOKIES, callback=self.parse_child)
+                        logger.success('子评论请求成功')
+
+                        items['uid'] = uid
+                        items['content'] = content
+                        items['date'] = date
+                        items['father'] = ''
+                        items['child'] = root
+                        yield items
+                    else:
+                        items['uid'] = uid
+                        items['content'] = content
+                        items['date'] = date
+                        items['father'] = ''
+                        items['child'] = ''
+                        yield items
             else:
                 break
 
 
+    # 返回子评论区后续的数据
+    def get_child_comment(self, response):
+        items = BilibiliCommentsItem()
+        comments = json.loads(response.text)
+        root = response.meta['root']
 
-    # 获取所有的子评论
+        for i in range(len(comments['data']['replies'])):
+            uid = comments['data']['replies'][i]['mid_str']
+            content = comments['data']['replies'][i]['content']['message']
+            date = datetime.fromtimestamp(comments['data']['replies'][i]['ctime']).strftime('%Y-%m-%d')
+
+            items['uid'] = uid
+            items['content'] = content
+            items['date'] = date
+            items['father'] = root
+            items['child'] = ''
+            yield items
+
+
+    # 获取后续所有的子评论
     def parse_child(self,response):
-        pass
+        items = BilibiliCommentsItem()
+        comments = json.loads(response.text)
+        root = response.meta['root']
+        count = comments['data']['page']['count']
+        pages = math.ceil(count / 10)
+
+        for i in range(2, pages + 1):
+            params = self.params_chlid.copy()
+            params['oid'] = self.oid
+            params["wts"] = int(time.time())
+            params["root"] = root
+            params["pn"] = i
+            w_rid = self.get_rid(params)
+            params['w_rid'] = w_rid
+            url = self.url_child + urlencode(params)
+            yield scrapy.Request(url=url,headers=HEADERS, meta={'root': root}, cookies=COOKIES, callback=self.get_child_comment)
+            logger.success('子评论请求成功')
+
+
+        for i in range(len(comments['data']['replies'])):
+            uid = comments['data']['replies'][i]['mid_str']
+            content = comments['data']['replies'][i]['content']['message']
+            date = datetime.fromtimestamp(comments['data']['replies'][i]['ctime']).strftime('%Y-%m-%d')
+
+            items['uid'] = uid
+            items['content'] = content
+            items['date'] = date
+            items['father'] = root
+            items['child'] = ''
+            yield items
+
+
+
 
 
 
