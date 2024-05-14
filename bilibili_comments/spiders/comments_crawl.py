@@ -139,15 +139,15 @@ class CommentsCrawlSpider(scrapy.Spider):
                         items['uid'] = uid
                         items['content'] = content
                         items['date'] = date
-                        items['father'] = ''
+                        items['father'] = 'null'
                         items['child'] = root
                         yield items
                     else:
                         items['uid'] = uid
                         items['content'] = content
                         items['date'] = date
-                        items['father'] = ''
-                        items['child'] = ''
+                        items['father'] = 'null'
+                        items['child'] = 'null'
                         yield items
             else:
                 break
@@ -168,7 +168,7 @@ class CommentsCrawlSpider(scrapy.Spider):
             items['content'] = content
             items['date'] = date
             items['father'] = root
-            items['child'] = ''
+            items['child'] = 'null'
             yield items
 
 
@@ -202,7 +202,7 @@ class CommentsCrawlSpider(scrapy.Spider):
             items['content'] = content
             items['date'] = date
             items['father'] = root
-            items['child'] = ''
+            items['child'] = 'null'
             yield items
 
 

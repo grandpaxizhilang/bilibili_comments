@@ -4,6 +4,9 @@
 # https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
 from scrapy import signals
+import random
+from Scarpy.bilibili_comments.bilibili_comments.settings import USER_AGENTS_LIST
+from Scarpy.bilibili_comments.bilibili_comments.settings import PROXY_LIST
 
 # useful for handling different item types with a single interface
 from itemadapter import is_item, ItemAdapter
@@ -101,3 +104,24 @@ class BilibiliCommentsDownloaderMiddleware:
 
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
+
+
+# UA代理
+class UserAgentMiddleware(object):
+    def process_request(self, request, spider):  # 这里也可以通过 spider.name 判断爬虫名称对特定爬虫执行添加UA的操作
+        request.headers['User-Agent'] = random.choice(USER_AGENTS_LIST)
+
+
+# IP代理
+class RandomProxyMiddleware(object):
+    def process_request(self, request, spider):
+        proxy = random.choice(PROXY_LIST)  # 可以在配置文件中读取，也可以从Redis中获取，或者通过API获取
+
+        request.meta['proxy'] = proxy
+        return None
+
+    def process_response(self, request, response, spider):
+        if response.status != '200':
+            request.dont_filter = True # 重新发送的请求对象能够再次进入队列
+            return request
+

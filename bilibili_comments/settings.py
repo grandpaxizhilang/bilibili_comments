@@ -14,9 +14,8 @@ NEWSPIDER_MODULE = 'bilibili_comments.spiders'
 LOG_LEVEL = 'WARNING'
 
 
-# 有关请求参数的设置:
 # 设置bv号
-BV = ['BV1pZ421E7Er']
+BV = ['BV1AM4y1M71p']
 # 爬取父评论的睡眠时间
 father_time = 1
 # 设置cookie
@@ -58,9 +57,29 @@ HEADERS = {
     'Referer':'https://space.bilibili.com',
     'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0'
 }
-
-
-
+# 存储csv文件的路径（填文件夹的路径）
+PATH = ''
+# 数据库登入
+MYSQL = {
+    'host': 'localhost',
+    'port': 3306,
+    'user': 'root',
+    'password': '123456',
+    'database': 'My_Data'
+}
+# UA存储列表
+USER_AGENTS_LIST = [
+    "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Win64; x64; Trident/5.0; .NET CLR 3.5.30729; .NET CLR 3.0.30729; .NET CLR 2.0.50727; Media Center PC 6.0)",
+    "Mozilla/5.0 (compatible; MSIE 8.0; Windows NT 6.0; Trident/4.0; WOW64; Trident/4.0; SLCC2; .NET CLR 2.0.50727; .NET CLR 3.5.30729; .NET CLR 3.0.30729; .NET CLR 1.0.3705; .NET CLR 1.1.4322)",
+    "Mozilla/4.0 (compatible; MSIE 7.0b; Windows NT 5.2; .NET CLR 1.1.4322; .NET CLR 2.0.50727; InfoPath.2; .NET CLR 3.0.04506.30)",
+    "Mozilla/5.0 (Windows; U; Windows NT 5.1; zh-CN) AppleWebKit/523.15 (KHTML, like Gecko, Safari/419.3) Arora/0.3 (Change: 287 c9dfb30)",
+    "Mozilla/5.0 (X11; U; Linux; en-US) AppleWebKit/527+ (KHTML, like Gecko, Safari/419.3) Arora/0.6",
+    "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.2pre) Gecko/20070215 K-Ninja/2.1.1",
+    "Mozilla/5.0 (Windows; U; Windows NT 5.1; zh-CN; rv:1.9) Gecko/20080705 Firefox/3.0 Kapiko/3.0",
+    "Mozilla/5.0 (X11; Linux i686; U;) Gecko/20070322 Kazehakase/0.4.5"
+]
+# IP存储列表
+PROXY_LIST = []
 
 
 
@@ -101,9 +120,14 @@ COOKIES_ENABLED = False
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
-#DOWNLOADER_MIDDLEWARES = {
-#    'bilibili_comments.middlewares.BilibiliCommentsDownloaderMiddleware': 543,
-#}
+DOWNLOADER_MIDDLEWARES = {
+    # 'bilibili_comments.middlewares.BilibiliCommentsDownloaderMiddleware': 543,
+
+    # ip代理和ua代理
+    # 'bilibili_comments.middlewares.RandomProxyMiddleware': 200,
+    'bilibili_comments.middlewares.UserAgentMiddleware': 543
+
+}
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
@@ -113,9 +137,11 @@ COOKIES_ENABLED = False
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    'bilibili_comments.pipelines.BilibiliCommentsPipeline': 300,
-#}
+ITEM_PIPELINES = {
+    # 如果都开启，先保存csv再存到数据库中
+    # 'bilibili_comments.pipelines.CSV_Pipeline': 300,
+    'bilibili_comments.pipelines.MYSQL_Pipeline': 301,
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
